@@ -5,6 +5,8 @@ Fuzzy Sets II course project
 
 - Install pip
 - install streamlit
+  
+    ```pip install streamlit```
 
 **Run code**
 

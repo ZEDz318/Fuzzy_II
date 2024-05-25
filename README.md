@@ -10,7 +10,8 @@ Fuzzy Sets II course project
 
 **Run code**
 
-Use thic command in terminal:
+1. Add data.xlsx file to directory (containing all relevant data)
+2. Use this command in terminal:
 ```
 streamlit run data.xlsx
 ```

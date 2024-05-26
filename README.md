@@ -13,5 +13,5 @@ Fuzzy Sets II course project
 1. Add data.xlsx file to directory (containing all relevant data)
 2. Use this command in terminal:
 ```
-streamlit run data.xlsx
+streamlit run main.py
 ```

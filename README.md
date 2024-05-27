@@ -8,6 +8,10 @@ Fuzzy Sets II course project
   
     ```pip install streamlit```
 
+- install openpyxl
+
+  ```pip install openpyxl```
+
 **Run code**
 
 1. Add data.xlsx file to directory (containing all relevant data)

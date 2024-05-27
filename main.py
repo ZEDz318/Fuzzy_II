@@ -1,3 +1,4 @@
+import seaborn as sns
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -8,27 +9,31 @@ st.title('Governmental Financial Aid Analysis')
 # Input for budget
 budget = st.number_input("Enter the total budget for financial aid (in CHF):", min_value=0.0, step=1000.0)
 
-
 # Function to compute financial aid score
 def compute_aid_score(row):
-    # Example arbitrary weights for the formula
+
     age_weight = 0.1
-    income_weight = 0.3
+    income_weight = 0.25
     marital_status_weight = 0.1
-    children_weight = 0.2
+    children_weight = 0.1
     social_help_weight = 0.1
     living_years_weight = 0.1
     student_weight = 0.1
+    net_income_weight = 0.1
+    wealth_weight = 0.05
+    financial_change_weight = 0.05
 
     # Normalizing the values (example normalization)
     age = row['Age'] / 100 if pd.notnull(row['Age']) else 0
-    income = row['Income (yearly in CHF)'] / 100000 if pd.notnull(row['Income (yearly in CHF)']) else 0
+    income = row['Income (yearly in CHF)'] / 100000 or 0
     marital_status = 1 if row['Marital status'] == 'Single' else 0.5
-    children = row['Number of children'] / 10 if pd.notnull(row['Number of children']) else 0
+    children = row['Number of children'] / 10 or 0
     social_help = 1 if row['Receive social help (Von socialhelfe oder SRK)'] == 'Yes' else 0
-    living_years = row['Living in switzerland since (in years)'] / 100 if pd.notnull(
-        row['Living in switzerland since (in years)']) else 0
-    student = 1 if row['Student (Uni, Hochschule, Lehre, oder ausbildung)'] == 'Yes' else 0
+    living_years = int(row['Living in Switzerland since (in years)']) / 100 or 0
+    student = 1 if row['Student (Uni Hochschule Lehre ausbildung)'] == 'Yes' else 0
+    net_income = row['Net Income (Reineinkommen) in CHF'] / 100000 or 0
+    wealth = row['Wealth (Vermögen) in CHF'] / 1000000 or 0
+    financial_change = 1 if row['Significant financial change'] == 'Yes' else 0
 
     # Calculate the score
     score = (age_weight * age +
@@ -37,10 +42,23 @@ def compute_aid_score(row):
              children_weight * children +
              social_help_weight * social_help +
              living_years_weight * living_years +
-             student_weight * student)
+             student_weight * student +
+             net_income_weight * (1 - net_income) +
+             wealth_weight * (1 - wealth) +
+             financial_change_weight * financial_change)
 
     return score
 
+# Function to assign priority based on aid score
+# def assign_priority(score):
+#     if score < 0.25:
+#         return 'Very Low Priority'
+#     elif 0.25 <= score < 0.5:
+#         return 'Low Priority'
+#     elif 0.5 <= score < 0.75:
+#         return 'Medium Priority'
+#     else:
+#         return 'High Priority'
 
 # Read the Excel file directly
 file_path = 'data.xlsx'
@@ -61,6 +79,32 @@ if budget > 0:
 
     # Distribute the budget based on normalized aid scores
     df['Allocated Budget (CHF)'] = df['Normalized Aid Score'] * budget
+
+    # Calculate the average aid score of all data points
+    average_score = df['Aid Score'].mean()
+
+    # Split the data into two halves based on whether the aid score is above or below the average
+    above_average = df[df['Aid Score'] > average_score]
+    below_average = df[df['Aid Score'] <= average_score]
+
+    # Calculate the average aid score of each half
+    avg_above = above_average['Aid Score'].mean()
+    avg_below = below_average['Aid Score'].mean()
+
+    # Split each half into two further halves based on whether the aid score is above or below the average of that half
+    high_priority = above_average[above_average['Aid Score'] > avg_above]
+    medium_priority = above_average[above_average['Aid Score'] <= avg_above]
+    low_priority = below_average[below_average['Aid Score'] > avg_below]
+    very_low_priority = below_average[below_average['Aid Score'] <= avg_below]
+
+    # Assign priorities accordingly based on the four resulting groups
+    high_priority['Priority'] = 'High Priority'
+    medium_priority['Priority'] = 'Medium Priority'
+    low_priority['Priority'] = 'Low Priority'
+    very_low_priority['Priority'] = 'Very Low Priority'
+
+    # Combine the dataframes
+    df = pd.concat([high_priority, medium_priority, low_priority, very_low_priority])
 
     st.write("## Data with Aid Scores and Allocated Budget")
     st.write(df.head())
@@ -87,3 +131,22 @@ if budget > 0:
     ax.set_xlabel('Allocated Budget (CHF)')
     ax.set_ylabel('Number of Applicants')
     st.pyplot(fig)
+
+    st.write("## Data with Aid Scores and Allocated Budget")
+    st.write(df.head())
+
+    # Create histogram
+    st.write("## Histogram: Income vs Allocated Budget")
+    fig, ax = plt.subplots()
+    sns.histplot(data=df, x='Income (yearly in CHF)', y='Allocated Budget (CHF)', bins=20, ax=ax)
+    ax.set_xlabel('Income (yearly in CHF)')
+    ax.set_ylabel('Allocated Budget (CHF)')
+    st.pyplot(fig)
+
+    # Create pie chart of priorities
+    st.write("## Pie Chart of Priorities")
+    priority_counts = df['Priority'].value_counts()
+    fig, ax = plt.subplots()
+    ax.pie(priority_counts, labels=priority_counts.index, autopct='%1.1f%%')
+    st.pyplot(fig)
+

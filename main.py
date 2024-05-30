@@ -13,15 +13,15 @@ budget = st.number_input("Enter the total budget for financial aid (in CHF):", m
 def compute_aid_score(row):
 
     age_weight = 0.1
-    income_weight = 0.25
+    income_weight = 0.50
     marital_status_weight = 0.1
     children_weight = 0.1
     social_help_weight = 0.1
-    living_years_weight = 0.1
     student_weight = 0.1
-    net_income_weight = 0.1
-    wealth_weight = 0.05
-    financial_change_weight = 0.05
+    # net_income_weight = 0.1
+    # wealth_weight = 0.05
+    # financial_change_weight = 0.05
+    # living_years_weight = 0.1
 
     # Normalizing the values (example normalization)
     age = row['Age'] / 100 if pd.notnull(row['Age']) else 0
@@ -29,11 +29,11 @@ def compute_aid_score(row):
     marital_status = 1 if row['Marital status'] == 'Single' else 0.5
     children = row['Number of children'] / 10 or 0
     social_help = 1 if row['Receive social help (Von socialhelfe oder SRK)'] == 'Yes' else 0
-    living_years = int(row['Living in Switzerland since (in years)']) / 100 or 0
     student = 1 if row['Student (Uni Hochschule Lehre ausbildung)'] == 'Yes' else 0
-    net_income = row['Net Income (Reineinkommen) in CHF'] / 100000 or 0
-    wealth = row['Wealth (Vermögen) in CHF'] / 1000000 or 0
-    financial_change = 1 if row['Significant financial change'] == 'Yes' else 0
+    # living_years = int(row['Living in Switzerland since (in years)']) / 100 or 0
+    # net_income = row['Net Income (Reineinkommen) in CHF'] / 100000 or 0
+    # wealth = row['Wealth (Vermögen) in CHF'] / 1000000 or 0
+    # financial_change = 1 if row['Significant financial change'] == 'Yes' else 0
 
     # Calculate the score
     score = (age_weight * age +
@@ -41,11 +41,10 @@ def compute_aid_score(row):
              marital_status_weight * marital_status +
              children_weight * children +
              social_help_weight * social_help +
-             living_years_weight * living_years +
-             student_weight * student +
-             net_income_weight * (1 - net_income) +
-             wealth_weight * (1 - wealth) +
-             financial_change_weight * financial_change)
+             student_weight * student)
+            #  net_income_weight * (1 - net_income) +
+            #  wealth_weight * (1 - wealth) +
+            #  financial_change_weight * financial_change)
 
     return score
 
@@ -63,29 +62,30 @@ def compute_aid_score(row):
 # Read the Excel file directly
 file_path = 'data.xlsx'
 df = pd.read_excel(file_path)
+yes_df = df[df['Service provided'] == 'Yes']
 
 if budget > 0:
     st.write("## Data Preview")
-    st.write(df.head())
+    st.write(df.head(200))
 
     # Calculate the financial aid score for each applicant
-    df['Aid Score'] = df.apply(compute_aid_score, axis=1)
+    yes_df['Aid Score'] = yes_df.apply(compute_aid_score, axis=1)
 
     # Drop rows with NaN aid scores
-    df = df.dropna(subset=['Aid Score'])
+    yes_df = yes_df.dropna(subset=['Aid Score'])
 
     # Normalize the aid scores to sum to 1
-    df['Normalized Aid Score'] = df['Aid Score'] / df['Aid Score'].sum()
+    yes_df['Normalized Aid Score'] = yes_df['Aid Score'] / yes_df['Aid Score'].sum()
 
     # Distribute the budget based on normalized aid scores
-    df['Allocated Budget (CHF)'] = df['Normalized Aid Score'] * budget
+    yes_df['Allocated Budget (CHF)'] = yes_df['Normalized Aid Score'] * budget
 
     # Calculate the average aid score of all data points
-    average_score = df['Aid Score'].mean()
+    average_score = yes_df['Aid Score'].mean()
 
     # Split the data into two halves based on whether the aid score is above or below the average
-    above_average = df[df['Aid Score'] > average_score]
-    below_average = df[df['Aid Score'] <= average_score]
+    above_average = yes_df[yes_df['Aid Score'] > average_score]
+    below_average = yes_df[yes_df['Aid Score'] <= average_score]
 
     # Calculate the average aid score of each half
     avg_above = above_average['Aid Score'].mean()
@@ -104,14 +104,11 @@ if budget > 0:
     very_low_priority['Priority'] = 'Very Low Priority'
 
     # Combine the dataframes
-    df = pd.concat([high_priority, medium_priority, low_priority, very_low_priority])
-
-    st.write("## Data with Aid Scores and Allocated Budget")
-    st.write(df.head())
+    yes_df = pd.concat([high_priority, medium_priority, low_priority, very_low_priority])
 
     # Pie chart of marital status
     st.write("## Pie Chart of Marital Status")
-    marital_status_counts = df['Marital status'].value_counts()
+    marital_status_counts = yes_df['Marital status'].value_counts()
     fig, ax = plt.subplots()
     ax.pie(marital_status_counts, labels=marital_status_counts.index, autopct='%1.1f%%')
     st.pyplot(fig)
@@ -119,7 +116,7 @@ if budget > 0:
     # Histogram of aid scores
     st.write("## Histogram of Aid Scores")
     fig, ax = plt.subplots()
-    ax.hist(df['Aid Score'], bins=10, edgecolor='black')
+    ax.hist(yes_df['Aid Score'], bins=10, edgecolor='black')
     ax.set_xlabel('Aid Score')
     ax.set_ylabel('Number of Applicants')
     st.pyplot(fig)
@@ -127,25 +124,25 @@ if budget > 0:
     # Histogram of allocated budget
     st.write("## Allocated Budget Distribution")
     fig, ax = plt.subplots()
-    ax.hist(df['Allocated Budget (CHF)'], bins=10, edgecolor='black')
+    ax.hist(yes_df['Allocated Budget (CHF)'], bins=10, edgecolor='black')
     ax.set_xlabel('Allocated Budget (CHF)')
     ax.set_ylabel('Number of Applicants')
     st.pyplot(fig)
 
     st.write("## Data with Aid Scores and Allocated Budget")
-    st.write(df.head())
+    st.write(yes_df.head(200))
 
     # Create histogram
     st.write("## Histogram: Income vs Allocated Budget")
     fig, ax = plt.subplots()
-    sns.histplot(data=df, x='Income (yearly in CHF)', y='Allocated Budget (CHF)', bins=20, ax=ax)
+    sns.histplot(data=yes_df, x='Income (yearly in CHF)', y='Allocated Budget (CHF)', bins=20, ax=ax)
     ax.set_xlabel('Income (yearly in CHF)')
     ax.set_ylabel('Allocated Budget (CHF)')
     st.pyplot(fig)
 
     # Create pie chart of priorities
     st.write("## Pie Chart of Priorities")
-    priority_counts = df['Priority'].value_counts()
+    priority_counts = yes_df['Priority'].value_counts()
     fig, ax = plt.subplots()
     ax.pie(priority_counts, labels=priority_counts.index, autopct='%1.1f%%')
     st.pyplot(fig)
